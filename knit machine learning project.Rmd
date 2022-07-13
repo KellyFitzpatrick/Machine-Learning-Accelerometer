@@ -1,0 +1,92 @@
+---
+title: "Machine Learning Accelorometers"
+author: "Kelly Fitzpatrick"
+date: "2022-07-12"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Machine Learning Accelormeters for belt, arm, forearm and dumbell
+
+The first steps in the machine learning processes of determining which exercises were performed correctly (classe =A) was to tidy the data. First, columns that were blank or contained NA in the test dataset were deleted from both datasets. Second, was to explore the variables and use a variety of methods for cross validation. If there were variables with low to zero variability they were deleted from the sets.  The nearZeroVar() function was used to eliminate variables whose standard deviations were close to zero and would in turn lead to low predictability power in the model. All variables came back false, so we did not need to eliminate any of the variables. 
+
+The next method for  cross validation I looked at the correlations between variables to eliminate variables with high correlations but running different models based on this method lead to lower accuracy rates of about 40%. I ended up leaving in all 51 variables. 
+
+The last method of cross validation I used was to look at the variable importance and try and only use variables with high impact to predict the five difference classes (A,B,C,D,E) this also resulted in models with lower accuracy rates. 
+
+I used qplot() to determine that the linear discriminant analysis “lda” model would be the best approach because the data seemed to be clustered in groups when I explored several plots in the exploratory phase. I only show two qplots for this report.
+
+Preprocessing was performed to evaluate the data points and see how the means compared to the standard deviations to see if any transformations of the data was needed. This did not seem necessary in the analysis. I also ran a few models with the preprocessing features and again this did not improve accuracy rates.
+The final model included all 51 variables with an accuracy rate of 70% therefore the out of same error was 30%.
+Any recommendation for improving accuracy beyond the 70% would be appreciated.
+Thank you for reviewing this project.
+
+
+```{r}
+#Load all libraries need for analysis
+library(caret)
+library(tidyverse)
+library(Hmisc)#for cut2
+
+#Load all files needed for analysis
+realtest<-read.csv("C:/Users/kfitzpatrick/OneDrive - County College of Morris/Kelly/Coursera/Machine Learning/pml-testing-clean.csv")
+realtest<-realtest[,-c(1:6)]
+
+train<-read.csv("C:/Users/kfitzpatrick/OneDrive - County College of Morris/Kelly/Coursera/Machine Learning/pml-training-clean.csv")
+train$classe<-as.factor(train$classe)
+
+#Check for zero variance in the variables
+nearZeroVar(train,saveMetrics=TRUE)#all are false week 2 covariate var slide #7
+
+#Spit the data into a training and pre-test set
+
+set.seed(3523)
+inTrain = createDataPartition(train$classe, p = 3/4)[[1]]
+
+train = train [inTrain,]
+test = train[-inTrain,]
+dim(train)
+train2<-train[,-c(1:6)]
+test2<-test[,-c(1:6)]
+
+#look for correlated predictors from week 2 lecture preprocessing with PCA
+#I tried eliminating variables in the model that were highly correlate but the accuracy would decrease by alot
+M<-round(abs(cor(train2[,-53])),2)
+diag(M)<-0
+which(M>.9,arr.ind=T) #roll_belt and accel_belt_z have .99 correlation
+
+#I tried running several different models such as svm, rf and they did not run in R on this dataset.
+#Upon looking at qplot to determine what model to use the lda model worked.
+#Because the data in the qplots were grouped in clusters I decided to the the lda model.
+
+qplot(roll_belt,pitch_belt,color=classe,data=train)
+qplot(yaw_belt,pitch_belt,color=classe,data=train)
+
+
+#the data used were all fields that contained belt, arm, forearm and dumbbell there were 52 variables used
+#I tried to reduce the number of varialbes used through varialbe selection methods but that only reduced the accuracy drastically
+#With accuracy of 70% my out of sample error was 30%. 
+
+modlda<-train(classe ~.,data=train2,method="lda") # 70 % accuracy
+
+modlda2<-train(classe ~.,data=train2,method="lda",preProcess="pca") # preprocess accuracy went down to 53%
+pred<-predict(modlda,test2)
+confusionMatrix(pred, test2$classe)
+
+
+predReal20<-predict(modlda,realtest)
+predReal20
+
+#I also tried to redcue the number of variables by looking at the variable importance but this also
+#resulted in decreases accuracy in the model. So all 52 variables were in the final model to result in the
+#highest accuracy.
+
+VI_F=varImp(modlda)#selecting only few important variables accuracy was only 42%
+VI_F
+
+
+```
+
